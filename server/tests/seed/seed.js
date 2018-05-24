@@ -4,13 +4,25 @@ const {User} = require('../../models/user');
 const jwt = require('jsonwebtoken');
 
 // Testing todo list
-const todos = [
-    {text: 'First todo test', _id: new ObjectID()},
-    {text: 'Second todo test', _id: new ObjectID(), completed: true, completedAt: 333}
-];
+
 
 const userOneId = new ObjectID();
 const userTwoId = new ObjectID();
+
+const todos = [
+    {
+        text: 'First todo test',
+        _id: new ObjectID(),
+        _creator: userOneId
+    },
+    {
+        text: 'Second todo test',
+        _id: new ObjectID(),
+        completed: true,
+        completedAt: 333,
+        _creator: userTwoId
+    }
+];
 
 const users = [
     {
@@ -19,13 +31,17 @@ const users = [
         password: 'user1pass',
         tokens:[{
             access: 'auth',
-            token: jwt.sign({_id: userOneId, access: 'auth'}, 'superSalt').toString()
+            token: jwt.sign({_id: userOneId, access: 'auth'}, process.env.JWT_SECRET).toString()
         }]
     },
     {
         _id: userTwoId,
         email: 'derp@derp.com',
-        password: 'user2pass'
+        password: 'user2pass',
+        tokens:[{
+            access: 'auth',
+            token: jwt.sign({_id: userTwoId, access: 'auth'}, process.env.JWT_SECRET).toString()
+        }]
     }
 ];
 

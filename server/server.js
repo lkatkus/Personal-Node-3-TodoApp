@@ -1,10 +1,5 @@
-const ENV = process.env.NODE_ENV || 'development';
-
-if(ENV === 'development'){
-    console.log('Development environment');
-}else if(ENV === 'test'){
-    console.log('Test environment');
-}
+// Setting env variables
+require('./config/config');
 
 // Dependency imports
 const express = require('express');
@@ -23,15 +18,17 @@ const {authenticate} = require('./middleware/authenticate');
 // Express app setup
 const app = express();
 
-const PORT = process.env.PORT || 3000; /* process.env.PORT for heroku deployement. */
+const PORT = process.env.PORT;
 
 // Middleware
 app.use(bodyParser.json());
 
 // TODOS ROUTES
 // GET ALL
-app.get('/todos', (req, res) => {
-    Todo.find()
+app.get('/todos', authenticate, (req, res) => {
+    Todo.find({
+        _creator: req.user._id
+    })
         .then((todos) => {
             res.send(todos);
         })
@@ -41,9 +38,12 @@ app.get('/todos', (req, res) => {
 });
 
 //GET BY ID
-app.get('/todos/:id', (req, res) => {
+app.get('/todos/:id', authenticate, (req, res) => {
     if(ObjectID.isValid(req.params.id)){ /* Checking if provided id is valid */
-        Todo.findById(req.params.id)
+        Todo.findOne({
+            _id: req.params.id,
+            _creator: req.user._id
+        })
         .then((todo) => {
             if(!todo){ /* check if anything was found */
                 return res.status(404).send()
@@ -60,9 +60,10 @@ app.get('/todos/:id', (req, res) => {
 })
 
 // CREATE
-app.post('/todos', (req, res) => {
+app.post('/todos', authenticate, (req, res) => {
     let todo = new Todo({
-        text: req.body.text
+        text: req.body.text,
+        _creator: req.user._id
     })
 
     todo.save()
@@ -75,9 +76,12 @@ app.post('/todos', (req, res) => {
 });
 
 // DELETE
-app.delete('/todos/:id', (req, res) => {
+app.delete('/todos/:id', authenticate, (req, res) => {
     if(ObjectID.isValid(req.params.id)){ /* Checking if provided id is valid */
-        Todo.findByIdAndRemove(req.params.id)
+        Todo.findOneAndRemove({
+            _id: req.params.id,
+            _creator: req.user._id
+        })
         .then((todo) => {
             if(!todo){ /* check if anything was found */
                 return res.status(404).send()
@@ -94,7 +98,7 @@ app.delete('/todos/:id', (req, res) => {
 })
 
 // PATCH
-app.patch('/todos/:id', (req, res) => {
+app.patch('/todos/:id', authenticate, (req, res) => {
     let body = _.pick(req.body, ['text', 'completed']);
 
     if(ObjectID.isValid(req.params.id)){ /* Checking if provided id is valid */
@@ -107,7 +111,10 @@ app.patch('/todos/:id', (req, res) => {
             body.completedAt = null;
         }
 
-        Todo.findByIdAndUpdate(req.params.id, {$set: body}, {new: true})
+        Todo.findOneAndUpdate({
+            _id: req.params.id,
+            _creator: req.user._id
+        }, {$set: body}, {new: true})
             .then((todo) => {
                 if(!todo){
                     return res.status(404).send();    
@@ -144,7 +151,7 @@ app.get('/users/me', authenticate, (req, res) => {
     res.send(req.user);
 })
 
-// LOGIN RATE
+// LOGIN ROUTE
 app.post('/users/login', (req, res) => {
     let body = _.pick(req.body, ['email','password']); /* get only email and password from request body */
     
@@ -158,8 +165,18 @@ app.post('/users/login', (req, res) => {
         .catch((err) => {
             res.status(400).send();
         })
-
 })
+
+// LOGOUT ROUTE
+app.delete('/users/me/token', authenticate, (req, res) => {
+    req.user.removeToken(req.token)
+        .then(() => {
+            res.status(200).send();
+        })
+        .catch((err) => {
+            res.status(400).send();
+        })
+});
 
 // Server listener
 app.listen(PORT, () => {
